@@ -38,16 +38,13 @@
 #       OTHER DEALINGS IN THE SOFTWARE.
 
 import glob
-import os
-import sys
-import re
-import subprocess
-import shutil
 import itertools
+import os
+import shutil
+import subprocess
+import sys
 import time
-
 from copy import deepcopy
-from subprocess import Popen, PIPE, CalledProcessError
 
 
 class Switcher(object):
@@ -155,7 +152,6 @@ class Switcher(object):
                 else:
                     return 0
 
-
     def _get_bootvga_card(self):
         bootvga = ''
         cards = glob.glob('/sys/class/drm/card[0-9]')
@@ -179,10 +175,9 @@ class Switcher(object):
             t = f.read()
             f.close()
             return t.strip()
-        return ''
 
     def _has_integrated_gpu(self):
-        status = False;
+        status = False
 
         path = '/var/lib/ubuntu-drivers-common/last_gfx_boot'
         if os.path.isfile(path):
@@ -195,7 +190,7 @@ class Switcher(object):
             card = self._get_bootvga_card()
             if card:
                 vendor = self._get_card_vendor(card)
-                if t.find('8086') != -1 or t.lower().find('1002') != -1:
+                if vendor.find('8086') != -1 or vendor.lower().find('1002') != -1:
                     status = True
 
         return status
@@ -249,7 +244,7 @@ class Switcher(object):
             self._disable_nvidia(keep_nvidia_modules=True)
         else:
             # Make sure that the installed packages support PRIME
-            #if not self._supports_prime():
+            # if not self._supports_prime():
             #    sys.stderr.write('Error: the installed packages do not support PRIME\n')
             #    return False
             self._disable_nvidia()
@@ -354,7 +349,7 @@ options nvidia-drm modeset=%d''' % (value)
                     f.write('%s%s' % ((it > 0 and '\n' or ''), new_line))
                 else:
                     f.write('%s%s' % ((it > 0 and '\n' or ''), line))
-                it +=1
+                it += 1
             f.truncate()
 
     def _remove_boot_params(self, pattern, path, params):
@@ -379,9 +374,8 @@ options nvidia-drm modeset=%d''' % (value)
                     f.write('%s%s' % ((it > 0 and '\n' or ''), new_line))
                 else:
                     f.write('%s%s' % ((it > 0 and '\n' or ''), line))
-                it +=1
+                it += 1
             f.truncate()
-
 
     def _find_connected_connectors(self, card):
         connectors = glob.glob('/sys/class/drm/%s-*' % (card))
@@ -408,12 +402,12 @@ options nvidia-drm modeset=%d''' % (value)
     def _update_initramfs(self):
         # Create spinner to give feed back on the
         # operation
-        spinner = itertools.cycle ( ['-', '/', '|', '\\'])
-        proc = subprocess.Popen(['update-initramfs', '-u'],stdout=subprocess.PIPE)
+        spinner = itertools.cycle(['-', '/', '|', '\\'])
+        proc = subprocess.Popen(['update-initramfs', '-u'], stdout=subprocess.PIPE)
         print('Updating the initramfs. Please wait for the operation to complete:')
 
         # Check if process is still running
-        while proc.poll()==None:
+        while proc.poll() == None:
             try:
                 # Print the spinner
                 sys.stdout.write(spinner.__next__())
@@ -426,7 +420,7 @@ options nvidia-drm modeset=%d''' % (value)
         print('Done')
 
         # Print out the output
-        output=proc.communicate()[0]
+        output = proc.communicate()[0]
 
     def _update_grub(self):
         subprocess.call(['update-grub'])
@@ -442,12 +436,15 @@ def check_root():
         sys.stderr.write("This operation requires root privileges\n")
         exit(1)
 
+
 def handle_query_error():
     sys.stderr.write("Error: no profile can be found\n")
     exit(1)
 
+
 def usage():
     sys.stderr.write("Usage: %s nvidia|intel|on-demand|query\n" % (sys.argv[0]))
+
 
 if __name__ == '__main__':
     try:
