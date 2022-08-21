@@ -44,7 +44,6 @@ import shutil
 import subprocess
 import sys
 import time
-from copy import deepcopy
 
 
 class Switcher(object):
@@ -52,7 +51,6 @@ class Switcher(object):
     def __init__(self):
         self._power_profile_path = '/etc/prime-discrete'
         self._grub_path = '/etc/default/grub'
-        self._grub_cmdline_start = 'GRUB_CMDLINE_LINUX_DEFAULT='
         self._old_blacklist_file = '/etc/modprobe.d/blacklist-nvidia.conf'
         self._blacklist_file = '/lib/modprobe.d/blacklist-nvidia.conf'
         self._nvidia_kms_file = '/lib/modprobe.d/nvidia-kms.conf'
@@ -198,9 +196,6 @@ class Switcher(object):
     def _supports_runtimepm(self):
         return os.path.isfile('/run/nvidia_runtimepm_supported')
 
-    def _is_runtimepm_enabled(self):
-        return os.path.isfile('/run/nvidia_runtimepm_enabled')
-
     def _enable_runtimepm(self):
         print('Writing %s' % self._nvidia_runtimepm_file)
         pm_fd = open(self._nvidia_runtimepm_file, 'w')
@@ -322,88 +317,11 @@ options nvidia-drm modeset=%d''' % (value)
     def _disable_kms(self):
         self._write_kms_settings(0)
 
-    def _add_boot_params(self, pattern, path, params):
-        it = 0
-        arg_found = False
-
-        with open(path, 'r+') as f:
-            t = f.read()
-            f.seek(0)
-            for line in t.split('\n'):
-                if line.startswith(pattern):
-                    boot_args = line.replace(pattern, '').replace('"', '')
-                    boot_args_list = boot_args.split(' ')
-                    final_boot_args = deepcopy(boot_args_list)
-
-                    for key, value in params.items():
-                        target_param = '%s=%s' % (key, value)
-                        for i, arg in enumerate(boot_args_list):
-                            if key in arg:
-                                arg_found = True
-                                final_boot_args[i] = '%s' % (target_param)
-                        if not arg_found:
-                            final_boot_args.append(target_param)
-                        else:
-                            arg_found = False
-                    new_line = '%s"%s"' % (pattern, ' '.join(final_boot_args))
-                    f.write('%s%s' % ((it > 0 and '\n' or ''), new_line))
-                else:
-                    f.write('%s%s' % ((it > 0 and '\n' or ''), line))
-                it += 1
-            f.truncate()
-
-    def _remove_boot_params(self, pattern, path, params):
-        it = 0
-        arg_found = False
-
-        with open(path, 'r+') as f:
-            t = f.read()
-            f.seek(0)
-            for line in t.split('\n'):
-                if line.startswith(pattern):
-                    boot_args = line.replace(pattern, '').replace('"', '')
-                    boot_args_list = boot_args.split(' ')
-                    final_boot_args = deepcopy(boot_args_list)
-
-                    for key in params:
-                        for i, arg in enumerate(boot_args_list):
-                            if key in arg:
-                                final_boot_args[i] = ''
-                    final_boot_args = list(filter(bool, final_boot_args))
-                    new_line = '%s"%s"' % (pattern, ' '.join(final_boot_args))
-                    f.write('%s%s' % ((it > 0 and '\n' or ''), new_line))
-                else:
-                    f.write('%s%s' % ((it > 0 and '\n' or ''), line))
-                it += 1
-            f.truncate()
-
-    def _find_connected_connectors(self, card):
-        connectors = glob.glob('/sys/class/drm/%s-*' % (card))
-        connected_connectors = []
-        for connector in connectors:
-            path = '%s/status' % connector
-            with open(path, 'r') as f:
-                t = f.read()
-                if t.strip() == 'connected':
-                    connected_connectors.append(connector)
-                f.close()
-        return connected_connectors
-
-    def _get_boot_params_from_phantom_vga_connectors(self):
-        params = []
-        connectors = self._find_connected_connectors('card1')
-        for connector in connectors:
-            if 'vga' in connector.lower():
-                conn = connector.replace('/sys/class/drm/card1-', '').replace('-', '')
-                param = 'video=%s:d' % conn
-                params.append(param)
-        return params
-
     def _update_initramfs(self):
         # Create spinner to give feed back on the
         # operation
         spinner = itertools.cycle(['-', '/', '|', '\\'])
-        proc = subprocess.Popen(['update-initramfs', '-u'], stdout=subprocess.PIPE)
+        proc = subprocess.Popen(['update-initramfs', '-u', '-k', 'all'], stdout=subprocess.PIPE)
         print('Updating the initramfs. Please wait for the operation to complete:')
 
         # Check if process is still running
@@ -421,9 +339,6 @@ options nvidia-drm modeset=%d''' % (value)
 
         # Print out the output
         output = proc.communicate()[0]
-
-    def _update_grub(self):
-        subprocess.call(['update-grub'])
 
     def _backup_grub_config(self):
         destination = '%s.prime-backup' % self._grub_path
